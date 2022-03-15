@@ -3,70 +3,54 @@ package com.example.logs.config;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.slf4j.MDC;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.servlet.HandlerInterceptor;
+import org.springframework.web.servlet.ModelAndView;
 
+import javax.servlet.DispatcherType;
 import javax.servlet.FilterChain;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.util.UUID;
 
+
 @Component
-@Data
-@EqualsAndHashCode(callSuper = false)
-public class LogInterceptor extends OncePerRequestFilter {
+public class LogInterceptor implements HandlerInterceptor {
 
-    private final String responseHeader;
-    private final String mdcKey;
-    private final String requestHeader;
+    @Autowired
+    ILoggingService loggingService;
 
-    public LogInterceptor() {
-        responseHeader = ConfigInterceptor.DEFAULT_HEADER_TOKEN;
-        mdcKey = ConfigInterceptor.DEFAULT_MDC_UUID_TOKEN_KEY;
-        requestHeader = ConfigInterceptor.DEFAULT_HEADER_TOKEN;
-    }
-
-    public LogInterceptor(final String responseHeader, final String mdcTokenKey, final String requestHeader) {
-        this.responseHeader = responseHeader;
-        this.mdcKey = mdcTokenKey;
-        this.requestHeader = requestHeader;
-    }
+    private final String CORRELATION_ID = "correlation-id";
 
     @Override
-    protected void doFilterInternal(final HttpServletRequest request, final HttpServletResponse response, final FilterChain chain)
-            throws java.io.IOException, ServletException {
-        try {
-            final String token = extractToken(request);
-            MDC.put(mdcKey, token);
-            if (StringUtils.hasText(responseHeader)) {
-                response.addHeader(responseHeader, token);
-            }
-            chain.doFilter(request, response);
-        } finally {
-            MDC.remove(mdcKey);
+    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
+        MDC.put(CORRELATION_ID, getCorrelationId(request));
+        if (DispatcherType.REQUEST.name().equals(request.getDispatcherType().name()) && request.getMethod().equals(HttpMethod.GET.name())) {
+            loggingService.logRequest(request, null);
         }
-    }
 
-    private String extractToken(final HttpServletRequest request) {
-        final String token;
-        if (StringUtils.hasText(requestHeader) && StringUtils.hasText(request.getHeader(requestHeader))) {
-            token = request.getHeader(requestHeader);
-        } else {
-            token = UUID.randomUUID().toString().toUpperCase().replace("-", "");
-        }
-        return token;
+        return true;
     }
-
-    @Override
-    protected boolean isAsyncDispatch(final HttpServletRequest request) {
-        return false;
+    /**
+     * @param request
+     * @return
+     */
+    private String getCorrelationId(HttpServletRequest request) {
+        return UUID.randomUUID().toString();
     }
 
     @Override
-    protected boolean shouldNotFilterErrorDispatch() {
-        return false;
+    public void postHandle(HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse, Object o, ModelAndView modelAndView) throws Exception {
+
     }
 
+    @Override
+    public void afterCompletion(HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse, Object o, Exception e) throws Exception {
+        MDC.remove(CORRELATION_ID);
+    }
 }

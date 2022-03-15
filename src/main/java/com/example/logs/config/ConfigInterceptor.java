@@ -1,28 +1,22 @@
 package com.example.logs.config;
 
 import lombok.Data;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.stereotype.Component;
+import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurationSupport;
 
-@Configuration
-@Data
-public class ConfigInterceptor {
+@Component
+public class ConfigInterceptor extends WebMvcConfigurationSupport {
 
-    public static final String DEFAULT_HEADER_TOKEN = "correlationId";
-    public static final String DEFAULT_MDC_UUID_TOKEN_KEY = "correlationId";
+    @Autowired
+    LogInterceptor logInterceptor;
 
-    private String responseHeader = DEFAULT_HEADER_TOKEN;
-    private String mdcKey = DEFAULT_MDC_UUID_TOKEN_KEY;
-    private String requestHeader = DEFAULT_HEADER_TOKEN;
-
-    @Bean
-    public FilterRegistrationBean<LogInterceptor> servletRegistrationBean() {
-        final FilterRegistrationBean<LogInterceptor> registrationBean = new FilterRegistrationBean<>();
-        final LogInterceptor log4jMDCFilterFilter = new LogInterceptor(responseHeader, mdcKey, requestHeader);
-        registrationBean.setFilter(log4jMDCFilterFilter);
-        registrationBean.setOrder(2);
-        return registrationBean;
+    @Override
+    protected void addInterceptors(InterceptorRegistry registry) {
+        registry.addInterceptor(logInterceptor);
     }
-
 }
